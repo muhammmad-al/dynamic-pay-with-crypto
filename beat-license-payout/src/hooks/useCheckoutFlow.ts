@@ -10,6 +10,8 @@ import {
   getCheckoutTransaction,
   cancelCheckoutTransaction,
   getActiveNetworkData,
+  trackCheckoutTransaction,
+  onEvent,
 } from '@dynamic-labs-sdk/client';
 import type { CheckoutTransaction, CheckoutTransactionQuote } from '@dynamic-labs-sdk/client';
 import type { WalletAccount } from '@/hooks/useWalletAccounts';
@@ -42,6 +44,7 @@ export interface CheckoutFlowState {
   transactionId: string | null;
   transaction: CheckoutTransaction | null;
   quote: CheckoutTransactionQuote | null;
+  fromToken: PaymentToken | null;
   error: string | null;
   startedAt: number | null;
 }
@@ -60,6 +63,7 @@ export function useCheckoutFlow() {
     transactionId: null,
     transaction: null,
     quote: null,
+    fromToken: null,
     error: null,
     startedAt: null,
   });
@@ -67,17 +71,27 @@ export function useCheckoutFlow() {
   const transactionIdRef = useRef<string | null>(null);
   const stepRef = useRef<FlowStep>('idle');
   const fromTokenRef = useRef<string>('0x0000000000000000000000000000000000000000');
+  // Realtime event unsubscribe functions
+  const unsubsRef = useRef<Array<() => void>>([]);
 
   useEffect(() => {
     stepRef.current = state.step;
   }, [state.step]);
 
+  const cleanupRealtime = useCallback(() => {
+    unsubsRef.current.forEach((fn) => fn());
+    unsubsRef.current = [];
+  }, []);
+
   const setError = useCallback(
-    (error: string) => setState((s) => ({ ...s, step: 'failed', error })),
-    []
+    (error: string) => {
+      cleanupRealtime();
+      setState((s) => ({ ...s, step: 'failed', error }));
+    },
+    [cleanupRealtime]
   );
 
-  // --- Polling ---
+  // --- Polling (fallback) ---
   const { data: polledTx } = useQuery({
     queryKey: ['checkout-transaction', state.transactionId],
     queryFn: () => getCheckoutTransaction({ transactionId: state.transactionId! }),
@@ -100,27 +114,31 @@ export function useCheckoutFlow() {
     setState((s) => ({ ...s, transaction: polledTx }));
 
     if (polledTx.settlementState === 'completed') {
+      cleanupRealtime();
       setState((s) => ({ ...s, step: 'settled' }));
     } else if (
       polledTx.settlementState === 'failed' ||
       TERMINAL_EXECUTION.includes(polledTx.executionState as TerminalExecution)
     ) {
+      cleanupRealtime();
       const reason =
         (polledTx.failure as { message?: string } | undefined)?.message ??
         `execution: ${polledTx.executionState}, settlement: ${polledTx.settlementState}`;
       setState((s) => ({ ...s, step: 'failed', error: reason }));
     }
-  }, [polledTx]);
+  }, [polledTx, cleanupRealtime]);
 
   // --- Main flow ---
   const start = useCallback(
     async ({ walletAccount, token, amount, receivingAddress }: StartParams) => {
+      cleanupRealtime();
       setState({
         step: 'creating',
         signingStep: null,
         transactionId: null,
         transaction: null,
         quote: null,
+        fromToken: token,
         error: null,
         startedAt: Date.now(),
       });
@@ -136,11 +154,6 @@ export function useCheckoutFlow() {
           destinationAddresses: receivingAddress
             ? [{ address: receivingAddress, chain: 'EVM' }]
             : undefined,
-          memo: {
-            beatId: 'summer-anthem-001',
-            producer: 'DJ Quantum',
-            licenseType: 'exclusive',
-          },
         });
 
         transactionIdRef.current = transaction.id;
@@ -179,7 +192,7 @@ export function useCheckoutFlow() {
         setError(err instanceof Error ? err.message : String(err));
       }
     },
-    [setError]
+    [setError, cleanupRealtime]
   );
 
   const confirm = useCallback(
@@ -190,8 +203,6 @@ export function useCheckoutFlow() {
       setState((s) => ({ ...s, step: 'submitting', signingStep: null }));
 
       try {
-        // walletAccount must be the real WalletAccount from getWalletAccounts()
-        // so the SDK can delegate signing to the attached wallet provider
         const afterSubmit = await submitCheckoutTransaction({
           transactionId: txId,
           walletAccount,
@@ -208,6 +219,62 @@ export function useCheckoutFlow() {
           signingStep: null,
           transaction: afterSubmit,
         }));
+
+        // Start realtime WebSocket tracking (primary source for state updates)
+        try {
+          await trackCheckoutTransaction({ transactionId: txId });
+        } catch {
+          // Non-fatal — polling will cover it
+        }
+
+        // Subscribe to execution state changes
+        const unsubExec = onEvent({
+          event: 'checkoutTransactionExecutionStateChanged',
+          listener: (args) => {
+            if (args.transactionId !== txId) return;
+            setState((s) => {
+              if (s.step !== 'polling') return s;
+              const updatedTx = s.transaction
+                ? { ...s.transaction, executionState: args.newState } as CheckoutTransaction
+                : s.transaction;
+              if (TERMINAL_EXECUTION.includes(args.newState as TerminalExecution)) {
+                cleanupRealtime();
+                return {
+                  ...s,
+                  transaction: updatedTx,
+                  step: 'failed',
+                  error: `execution: ${args.newState}`,
+                };
+              }
+              return { ...s, transaction: updatedTx };
+            });
+          },
+        });
+
+        // Subscribe to settlement state changes
+        const unsubSettle = onEvent({
+          event: 'checkoutTransactionSettlementStateChanged',
+          listener: (args) => {
+            if (args.transactionId !== txId) return;
+            setState((s) => {
+              if (s.step !== 'polling') return s;
+              const updatedTx = s.transaction
+                ? { ...s.transaction, settlementState: args.newState } as CheckoutTransaction
+                : s.transaction;
+              if (args.newState === 'completed') {
+                cleanupRealtime();
+                return { ...s, transaction: updatedTx, step: 'settled' };
+              }
+              if (args.newState === 'failed') {
+                cleanupRealtime();
+                return { ...s, transaction: updatedTx, step: 'failed', error: 'settlement failed' };
+              }
+              return { ...s, transaction: updatedTx };
+            });
+          },
+        });
+
+        unsubsRef.current = [unsubExec, unsubSettle];
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
 
@@ -225,7 +292,7 @@ export function useCheckoutFlow() {
         setError(message);
       }
     },
-    [setError]
+    [setError, cleanupRealtime]
   );
 
   const refreshQuote = useCallback(async () => {
@@ -252,6 +319,7 @@ export function useCheckoutFlow() {
   }, [setError]);
 
   const reset = useCallback(() => {
+    cleanupRealtime();
     transactionIdRef.current = null;
     setState({
       step: 'idle',
@@ -259,10 +327,11 @@ export function useCheckoutFlow() {
       transactionId: null,
       transaction: null,
       quote: null,
+      fromToken: null,
       error: null,
       startedAt: null,
     });
-  }, []);
+  }, [cleanupRealtime]);
 
   return { state, start, confirm, refreshQuote, reset };
 }

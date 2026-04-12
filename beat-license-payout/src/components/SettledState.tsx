@@ -14,21 +14,27 @@ function truncateTxHash(hash?: string) {
   return `${hash.slice(0, 10)}…${hash.slice(-8)}`;
 }
 
-function formatElapsed(startedAt: number | null) {
+function formatElapsed(startedAt: number | null, endAt: number) {
   if (!startedAt) return null;
-  const secs = Math.floor((Date.now() - startedAt) / 1000);
+  const secs = Math.floor((endAt - startedAt) / 1000);
   if (secs < 60) return `${secs}s`;
   return `${Math.floor(secs / 60)}m ${secs % 60}s`;
 }
 
+function formatUsdcAmount(rawAmount?: string): string {
+  if (!rawAmount) return '—';
+  const num = Number(rawAmount) / 1e6;
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+}
+
 export function SettledState({ transaction, startedAt, onReset }: SettledStateProps) {
   const [copied, setCopied] = useState(false);
+  // Capture the settled timestamp once at mount — freezes the elapsed timer
+  const [settledAt] = useState(() => Date.now());
 
   const txHash = transaction?.txHash;
-  const settledAmount = transaction?.quote?.toAmount
-    ? `${parseFloat(transaction.quote.toAmount).toFixed(2)} USDC`
-    : '$50.00 USDC';
-  const elapsed = formatElapsed(startedAt);
+  const settledAmount = `${formatUsdcAmount(transaction?.quote?.toAmount)} USDC`;
+  const elapsed = formatElapsed(startedAt, settledAt);
 
   const copyHash = () => {
     if (!txHash) return;
@@ -59,10 +65,8 @@ export function SettledState({ transaction, startedAt, onReset }: SettledStatePr
       </div>
 
       <div className="text-center">
-        <h2 className="text-xl font-semibold text-white">Beat License Purchased</h2>
-        <p className="text-sm text-zinc-400 mt-1">
-          Payment complete for &quot;Summer Anthem&quot; by DJ Quantum
-        </p>
+        <h2 className="text-xl font-semibold text-white">Payment Complete</h2>
+        <p className="text-sm text-zinc-400 mt-1">Payment sent successfully</p>
       </div>
 
       {/* Details card */}

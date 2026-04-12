@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BeatCard } from '@/components/BeatCard';
+import { PaymentCard } from '@/components/PaymentCard';
 import { PendingState } from '@/components/PendingState';
 import { ProcessingState } from '@/components/ProcessingState';
 import { SettledState, FailedState } from '@/components/SettledState';
@@ -24,8 +24,9 @@ export default function Home() {
   const { state, start, confirm, refreshQuote, reset } = useCheckoutFlow();
   const { primaryAccount } = useWalletAccounts();
 
-  // Track amount so BeatCard stays in sync with what the user typed
-  const [displayAmount, setDisplayAmount] = useState('50.00');
+  // Live preview state — updates as user types
+  const [displayAmount, setDisplayAmount] = useState('');
+  const [displayRecipient, setDisplayRecipient] = useState('');
 
   const { step, transaction, startedAt, error } = state;
 
@@ -37,7 +38,6 @@ export default function Home() {
 
   const handleConfirm = ({ token, amount, receivingAddress }: PendingConfirmParams) => {
     if (!primaryAccount) return;
-    setDisplayAmount(amount);
     start({ walletAccount: primaryAccount, token, amount, receivingAddress });
   };
 
@@ -51,17 +51,35 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-zinc-950 px-4 py-12">
       <div className="max-w-2xl mx-auto">
+        {/* Header */}
         <div className="mb-8 text-center">
           <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2">
-            Dynamic · Pay with Crypto Demo
+            Powered by Dynamic
           </p>
-          <h1 className="text-2xl font-bold text-white">Beat License Payout</h1>
+          <h1 className="text-2xl font-bold text-white">Pay with Crypto Demo</h1>
         </div>
 
-        <BeatCard status={cardStatus} amount={displayAmount} />
+        {/* Invoice framing */}
+        {step === 'idle' && (
+          <div className="text-center mb-4">
+            <p className="text-xs text-zinc-600">Invoice #1042</p>
+            <p className="text-sm text-zinc-400 font-medium mt-0.5">Logo Design — Acme Corp</p>
+          </div>
+        )}
+
+        {/* Payment card — live preview while idle */}
+        <PaymentCard
+          status={cardStatus}
+          amount={displayAmount}
+          recipientAddress={displayRecipient || undefined}
+        />
 
         {step === 'idle' && (
-          <PendingState onConfirm={handleConfirm} />
+          <PendingState
+            onConfirm={handleConfirm}
+            onAmountChange={setDisplayAmount}
+            onAddressChange={setDisplayRecipient}
+          />
         )}
 
         {isProcessing && primaryAccount && (

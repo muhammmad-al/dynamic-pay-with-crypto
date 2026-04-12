@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Beat License Payout",
+  title: "Dynamic · Pay with Crypto Demo",
   description: "Pay with Crypto demo — Dynamic",
 };
 

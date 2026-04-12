@@ -53,16 +53,28 @@ export interface PendingConfirmParams {
 
 interface PendingStateProps {
   onConfirm: (params: PendingConfirmParams) => void;
+  onAmountChange?: (amount: string) => void;
+  onAddressChange?: (address: string) => void;
 }
 
-export function PendingState({ onConfirm }: PendingStateProps) {
+export function PendingState({ onConfirm, onAmountChange, onAddressChange }: PendingStateProps) {
   const { primaryAccount, isConnected } = useWalletAccounts();
   const providers = useWalletProviders();
   const [selectedToken, setSelectedToken] = useState<PaymentToken>(PAYMENT_TOKENS[0]);
-  const [amount, setAmount] = useState('50.00');
+  const [amount, setAmount] = useState('');
   const [receivingAddress, setReceivingAddress] = useState('');
   const [connecting, setConnecting] = useState<string | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
+
+  const handleAmountChange = (value: string) => {
+    setAmount(value);
+    onAmountChange?.(value);
+  };
+
+  const handleAddressChange = (value: string) => {
+    setReceivingAddress(value);
+    onAddressChange?.(value);
+  };
 
   const handleConnect = async (walletKey: string) => {
     setConnecting(walletKey);
@@ -78,6 +90,7 @@ export function PendingState({ onConfirm }: PendingStateProps) {
 
   const truncateAddress = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
+  const tokenKey = (t: PaymentToken) => `${t.chainId}-${t.tokenAddress}`;
   const amountValid = parseFloat(amount) > 0 && !isNaN(parseFloat(amount));
 
   return (
@@ -151,28 +164,29 @@ export function PendingState({ onConfirm }: PendingStateProps) {
 
       {isConnected && (
         <>
-          {/* Token picker */}
+          {/* Token dropdown */}
           <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-5">
             <p className="text-xs text-zinc-500 uppercase tracking-widest mb-3">Pay With</p>
-            <div className="space-y-2">
-              {PAYMENT_TOKENS.map((token) => (
-                <button
-                  key={`${token.chainId}-${token.tokenAddress}`}
-                  onClick={() => setSelectedToken(token)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
-                    selectedToken === token
-                      ? 'bg-blue-500/10 border-blue-500/40 text-blue-400'
-                      : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:border-zinc-600'
-                  }`}
-                >
-                  <span className="text-sm font-medium">{token.label}</span>
-                  {selectedToken === token && (
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </button>
-              ))}
+            <div className="relative">
+              <select
+                value={tokenKey(selectedToken)}
+                onChange={(e) => {
+                  const token = PAYMENT_TOKENS.find((t) => tokenKey(t) === e.target.value);
+                  if (token) setSelectedToken(token);
+                }}
+                className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors cursor-pointer pr-10"
+              >
+                {PAYMENT_TOKENS.map((token) => (
+                  <option key={tokenKey(token)} value={tokenKey(token)}>
+                    {token.label}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
           </div>
 
@@ -182,18 +196,18 @@ export function PendingState({ onConfirm }: PendingStateProps) {
 
             <div>
               <label className="block text-xs text-zinc-400 mb-1.5">Amount</label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 focus-within:border-blue-500 transition-colors">
                 <span className="text-zinc-500 text-sm">$</span>
                 <input
                   type="number"
                   min="0.01"
                   step="0.01"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500 transition-colors"
-                  placeholder="50.00"
+                  onChange={(e) => handleAmountChange(e.target.value)}
+                  className="flex-1 bg-transparent text-sm text-white placeholder-zinc-600 focus:outline-none"
+                  placeholder="0.00"
                 />
-                <span className="text-zinc-500 text-sm">USD</span>
+                <span className="text-zinc-500 text-sm shrink-0">USD</span>
               </div>
               {!amountValid && amount !== '' && (
                 <p className="text-xs text-red-400 mt-1">Enter a valid amount</p>
@@ -202,15 +216,15 @@ export function PendingState({ onConfirm }: PendingStateProps) {
 
             <div>
               <label className="block text-xs text-zinc-400 mb-1.5">
-                Producer&apos;s Wallet Address
-                <span className="text-zinc-600 ml-1">(optional — uses checkout default if empty)</span>
+                Recipient Address
+                <span className="text-zinc-600 ml-1">(optional)</span>
               </label>
               <input
                 type="text"
                 value={receivingAddress}
-                onChange={(e) => setReceivingAddress(e.target.value)}
+                onChange={(e) => handleAddressChange(e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500 transition-colors font-mono"
-                placeholder="0x… producer's wallet"
+                placeholder="0x..."
               />
             </div>
           </div>
@@ -223,7 +237,7 @@ export function PendingState({ onConfirm }: PendingStateProps) {
         disabled={!isConnected || !amountValid}
         className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-semibold text-sm transition-colors disabled:cursor-not-allowed"
       >
-        Pay for Beat License
+        Send Payment
       </button>
     </div>
   );

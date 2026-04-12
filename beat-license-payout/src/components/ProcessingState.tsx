@@ -37,9 +37,18 @@ const STEP_DESCRIPTIONS: Record<string, string> = {
   failed: 'Transaction failed',
 };
 
-function formatAmount(amount?: string) {
-  if (!amount) return '—';
-  return parseFloat(amount).toFixed(6).replace(/\.?0+$/, '');
+function getTokenDecimals(symbol?: string): number {
+  if (!symbol) return 18;
+  const s = symbol.toUpperCase();
+  if (s === 'USDC' || s === 'USDT') return 6;
+  if (s === 'SOL') return 9;
+  if (s === 'BTC') return 8;
+  return 18;
+}
+
+function formatTokenAmount(rawAmount: string, decimals: number): string {
+  const num = Number(rawAmount) / Math.pow(10, decimals);
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 }
 
 function formatTime(secs?: number) {
@@ -66,7 +75,7 @@ export function ProcessingState({
   onConfirm,
   onRefreshQuote,
 }: ProcessingStateProps) {
-  const { step, signingStep, transaction, quote, startedAt } = flowState;
+  const { step, signingStep, transaction, quote, startedAt, fromToken } = flowState;
 
   // Elapsed time counter
   const [elapsed, setElapsed] = useState(0);
@@ -101,6 +110,9 @@ export function ProcessingState({
   const isSpinning = ['creating', 'attaching', 'quoting', 'submitting', 'polling'].includes(step);
   const showQuote = step === 'awaiting_confirmation' && quote;
   const quoteExpired = quoteExpiry !== null && quoteExpiry === 0;
+
+  const fromSymbol = fromToken?.symbol ?? 'ETH';
+  const fromDecimals = getTokenDecimals(fromSymbol);
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4 mt-6">
@@ -139,6 +151,7 @@ export function ProcessingState({
           states={RISK_STATES}
           currentState={riskState}
           color="purple"
+          subtitle="Sanctions screening via Chainalysis"
         />
       </div>
 
@@ -161,11 +174,15 @@ export function ProcessingState({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-zinc-400">You send</span>
-              <span className="text-white font-medium">{formatAmount(quote.fromAmount)}</span>
+              <span className="text-white font-medium">
+                {formatTokenAmount(quote.fromAmount, fromDecimals)} {fromSymbol}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-zinc-400">They receive</span>
-              <span className="text-white font-medium">{formatAmount(quote.toAmount)} USDC</span>
+              <span className="text-white font-medium">
+                {formatTokenAmount(quote.toAmount, 6)} USDC
+              </span>
             </div>
             {quote.fees && (
               <div className="flex justify-between">

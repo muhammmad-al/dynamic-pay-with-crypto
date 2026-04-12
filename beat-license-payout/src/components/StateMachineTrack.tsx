@@ -5,6 +5,7 @@ interface StateMachineTrackProps {
   states: readonly string[];
   currentState: string;
   color: 'blue' | 'green' | 'purple';
+  subtitle?: string;
 }
 
 const colorMap = {
@@ -38,6 +39,7 @@ export function StateMachineTrack({
   states,
   currentState,
   color,
+  subtitle,
 }: StateMachineTrackProps) {
   const colors = colorMap[color];
   const currentIndex = states.indexOf(currentState);
@@ -46,7 +48,12 @@ export function StateMachineTrack({
   return (
     <div className="flex-1 min-w-0 rounded-xl bg-zinc-900 border border-zinc-800 p-4">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest">{label}</p>
+        <div>
+          <p className="text-xs text-zinc-500 uppercase tracking-widest">{label}</p>
+          {subtitle && (
+            <p className="text-[10px] text-zinc-600 mt-0.5">{subtitle}</p>
+          )}
+        </div>
         {isFailed ? (
           <span className="text-xs text-red-400 font-medium">{currentState}</span>
         ) : (
