@@ -35,10 +35,10 @@ export function PaymentCard({ status, amount = '', recipientAddress }: PaymentCa
 
   return (
     <div className="w-full max-w-md mx-auto rounded-2xl bg-zinc-900 border border-zinc-800 p-6">
-      {/* Amount */}
-      <div className="flex items-start justify-between gap-4 mb-5">
+      {/* Order total + Merchant Wallet */}
+      <div className="flex items-start justify-between gap-4 mb-4">
         <div>
-          <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Send</p>
+          <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Order Total</p>
           {displayAmt ? (
             <p className="text-3xl font-bold text-white">{displayAmt}</p>
           ) : (
@@ -47,13 +47,21 @@ export function PaymentCard({ status, amount = '', recipientAddress }: PaymentCa
           <p className="text-xs text-zinc-500 mt-0.5">USD</p>
         </div>
         <div className="text-right shrink-0 max-w-[55%]">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">To</p>
+          <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Merchant Wallet</p>
           {recipientAddress ? (
             <p className="text-sm font-mono text-zinc-300">{truncateAddress(recipientAddress)}</p>
           ) : (
             <p className="text-sm text-zinc-600 italic">checkout default</p>
           )}
         </div>
+      </div>
+
+      {/* Settlement pill */}
+      <div className="mb-4">
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+          Settles as USDC · Base
+        </span>
       </div>
 
       {/* Status badge */}

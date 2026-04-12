@@ -8,7 +8,7 @@ export async function initDynamicClient() {
   const { addEvmExtension } = await import('@dynamic-labs-sdk/evm');
 
   createDynamicClient({
-    environmentId: process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID!,
+    environmentId: process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID || '449fda96-0bdb-463d-aad8-a528bccaab05',
   });
 
   addEvmExtension();

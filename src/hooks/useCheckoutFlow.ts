@@ -10,6 +10,8 @@ import {
   getCheckoutTransaction,
   cancelCheckoutTransaction,
   getActiveNetworkData,
+  getNetworksData,
+  switchActiveNetwork,
   trackCheckoutTransaction,
   onEvent,
 } from '@dynamic-labs-sdk/client';
@@ -146,6 +148,10 @@ export function useCheckoutFlow() {
       fromTokenRef.current = token.tokenAddress;
 
       try {
+        // Debug: log which networks are actually enabled in the Dynamic dashboard
+        const allNetworks = getNetworksData();
+        console.log('Available networks:', allNetworks.map(n => ({ id: n.networkId, name: n.displayName, chain: n.chain })));
+
         // Step 1: Create transaction
         const { transaction } = await createCheckoutTransaction({
           checkoutId: CHECKOUT_ID,
@@ -164,13 +170,21 @@ export function useCheckoutFlow() {
           transaction,
         }));
 
-        // Step 2: Get the wallet's actual active chain ID, attach source
+        // Step 2: Switch wallet to the correct network, then attach source
+        await switchActiveNetwork({ walletAccount, networkId: token.networkId });
         const { networkData } = await getActiveNetworkData({ walletAccount });
+
+        if (!networkData) {
+          throw new Error(
+            `Network ${token.networkName} (${token.networkId}) is not enabled in your Dynamic dashboard. ` +
+            `Go to Chains & Networks settings to enable it.`
+          );
+        }
 
         const afterAttach = await attachCheckoutTransactionSource({
           transactionId: transaction.id,
           fromAddress: walletAccount.address,
-          fromChainId: networkData?.networkId ?? token.chainId,
+          fromChainId: networkData?.networkId ?? token.networkId,
           fromChainName: walletAccount.chain as 'EVM',
         });
 

@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dynamic · Pay with Crypto Demo",
-  description: "Pay with Crypto demo — Dynamic",
+  title: "Crypto Checkout Demo · Dynamic",
+  description: "Pay with any token — settle in USDC on Base. Powered by Dynamic.",
 };
 
 export default function RootLayout({

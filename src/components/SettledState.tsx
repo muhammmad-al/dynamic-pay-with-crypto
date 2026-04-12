@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import type { CheckoutTransaction } from '@dynamic-labs-sdk/client';
+import type { PaymentToken } from './PendingState';
 
 interface SettledStateProps {
   transaction: CheckoutTransaction | null;
+  fromToken: PaymentToken | null;
   startedAt: number | null;
   onReset: () => void;
 }
@@ -27,14 +29,33 @@ function formatUsdcAmount(rawAmount?: string): string {
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 }
 
-export function SettledState({ transaction, startedAt, onReset }: SettledStateProps) {
+function getTokenDecimals(symbol?: string): number {
+  if (!symbol) return 18;
+  const s = symbol.toUpperCase();
+  if (s === 'USDC' || s === 'USDT') return 6;
+  if (s === 'SOL') return 9;
+  if (s === 'BTC') return 8;
+  return 18;
+}
+
+function formatTokenAmount(rawAmount: string | undefined, decimals: number): string {
+  if (!rawAmount) return '—';
+  const num = Number(rawAmount) / Math.pow(10, decimals);
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+}
+
+export function SettledState({ transaction, fromToken, startedAt, onReset }: SettledStateProps) {
   const [copied, setCopied] = useState(false);
-  // Capture the settled timestamp once at mount — freezes the elapsed timer
+  // Capture settled timestamp at mount — freezes the elapsed timer
   const [settledAt] = useState(() => Date.now());
 
   const txHash = transaction?.txHash;
-  const settledAmount = `${formatUsdcAmount(transaction?.quote?.toAmount)} USDC`;
   const elapsed = formatElapsed(startedAt, settledAt);
+
+  const fromSymbol = fromToken?.symbol ?? 'ETH';
+  const fromDecimals = getTokenDecimals(fromSymbol);
+  const paidAmount = formatTokenAmount(transaction?.quote?.fromAmount, fromDecimals);
+  const receivedAmount = formatUsdcAmount(transaction?.quote?.toAmount);
 
   const copyHash = () => {
     if (!txHash) return;
@@ -55,18 +76,14 @@ export function SettledState({ transaction, startedAt, onReset }: SettledStatePr
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 13l4 4L19 7"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
       </div>
 
       <div className="text-center">
         <h2 className="text-xl font-semibold text-white">Payment Complete</h2>
-        <p className="text-sm text-zinc-400 mt-1">Payment sent successfully</p>
+        <p className="text-sm text-zinc-400 mt-1">Merchant received USDC on Base</p>
       </div>
 
       {/* Details card */}
@@ -77,16 +94,12 @@ export function SettledState({ transaction, startedAt, onReset }: SettledStatePr
 
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-zinc-400">Amount settled</span>
-            <span className="text-white font-medium">{settledAmount}</span>
+            <span className="text-zinc-400">You paid</span>
+            <span className="text-white font-medium">{paidAmount} {fromSymbol}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-zinc-400">Chain</span>
-            <span className="text-white">Base</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-400">Token</span>
-            <span className="text-white">USDC</span>
+            <span className="text-zinc-400">Merchant received</span>
+            <span className="text-green-400 font-medium">{receivedAmount} USDC on Base</span>
           </div>
           {elapsed && (
             <div className="flex justify-between">
@@ -124,7 +137,7 @@ export function SettledState({ transaction, startedAt, onReset }: SettledStatePr
   );
 }
 
-// Error state (reused when step === 'failed')
+// Error state
 interface FailedStateProps {
   error: string | null;
   onReset: () => void;
@@ -142,11 +155,7 @@ export function FailedState({ error, onReset }: FailedStateProps) {
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M6 18L18 6M6 6l12 12"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </div>
       </div>

@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-import { PaymentCard } from '@/components/PaymentCard';
 import { PendingState } from '@/components/PendingState';
 import { ProcessingState } from '@/components/ProcessingState';
 import { SettledState, FailedState } from '@/components/SettledState';
@@ -24,17 +22,7 @@ export default function Home() {
   const { state, start, confirm, refreshQuote, reset } = useCheckoutFlow();
   const { primaryAccount } = useWalletAccounts();
 
-  // Live preview state — updates as user types
-  const [displayAmount, setDisplayAmount] = useState('');
-  const [displayRecipient, setDisplayRecipient] = useState('');
-
-  const { step, transaction, startedAt, error } = state;
-
-  const cardStatus =
-    step === 'idle' ? 'pending'
-    : step === 'settled' ? 'settled'
-    : step === 'failed' ? 'failed'
-    : 'processing';
+  const { step, transaction, startedAt, error, fromToken } = state;
 
   const handleConfirm = ({ token, amount, receivingAddress }: PendingConfirmParams) => {
     if (!primaryAccount) return;
@@ -51,35 +39,9 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-zinc-950 px-4 py-12">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2">
-            Powered by Dynamic
-          </p>
-          <h1 className="text-2xl font-bold text-white">Pay with Crypto Demo</h1>
-        </div>
-
-        {/* Invoice framing */}
-        {step === 'idle' && (
-          <div className="text-center mb-4">
-            <p className="text-xs text-zinc-600">Invoice #1042</p>
-            <p className="text-sm text-zinc-400 font-medium mt-0.5">Logo Design — Acme Corp</p>
-          </div>
-        )}
-
-        {/* Payment card — live preview while idle */}
-        <PaymentCard
-          status={cardStatus}
-          amount={displayAmount}
-          recipientAddress={displayRecipient || undefined}
-        />
 
         {step === 'idle' && (
-          <PendingState
-            onConfirm={handleConfirm}
-            onAmountChange={setDisplayAmount}
-            onAddressChange={setDisplayRecipient}
-          />
+          <PendingState onConfirm={handleConfirm} />
         )}
 
         {isProcessing && primaryAccount && (
@@ -94,6 +56,7 @@ export default function Home() {
         {step === 'settled' && (
           <SettledState
             transaction={transaction}
+            fromToken={fromToken}
             startedAt={startedAt}
             onReset={reset}
           />
@@ -102,6 +65,7 @@ export default function Home() {
         {step === 'failed' && (
           <FailedState error={error} onReset={reset} />
         )}
+
       </div>
     </main>
   );

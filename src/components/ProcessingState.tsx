@@ -28,7 +28,7 @@ const RISK_STATES = ['unknown', 'pending', 'cleared'] as const;
 const STEP_DESCRIPTIONS: Record<string, string> = {
   idle: '',
   creating: 'Creating transaction…',
-  attaching: 'Attaching wallet source…',
+  attaching: 'Switching network & attaching wallet…',
   quoting: 'Fetching quote…',
   awaiting_confirmation: 'Review your quote below',
   submitting: 'Sending payment…',
@@ -113,6 +113,9 @@ export function ProcessingState({
 
   const fromSymbol = fromToken?.symbol ?? 'ETH';
   const fromDecimals = getTokenDecimals(fromSymbol);
+  const fromNetwork = fromToken?.networkName ?? null;
+  // Show network pill from 'attaching' onward (switch has been initiated)
+  const showNetworkPill = fromNetwork && step !== 'creating';
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4 mt-6">
@@ -123,6 +126,11 @@ export function ProcessingState({
             <div className="w-3 h-3 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
           )}
           <span className="text-sm text-zinc-300">{STEP_DESCRIPTIONS[step]}</span>
+          {showNetworkPill && (
+            <span className="text-xs text-zinc-400 bg-zinc-800 border border-zinc-700 rounded-full px-2 py-0.5">
+              {fromNetwork}
+            </span>
+          )}
           {signingStep && (
             <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-full px-2 py-0.5">
               {signingStep === 'approval' ? 'Approve token spend' : 'Sign transaction'}
