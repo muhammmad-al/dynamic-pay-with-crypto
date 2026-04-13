@@ -98,7 +98,6 @@ npm run dev
 - **Settlement states don't stream in real time** — The WebSocket channel (`subscribeToCheckoutTransaction`) subscribes to Ably but the backend doesn't publish to it yet. Falls back to HTTP polling.
 - **Gas price race on L2s** — `maxFeePerGas` from the quote can be stale by broadcast time on Arbitrum/Base. Retry usually works.
 - **ERC-20 approval is a separate tx** — Paying with a token (e.g. USDC) requires a spending cap approval before the swap transaction (two wallet popups).
-- **Unhelpful revert errors** — Insufficient balance for gas shows `FAILED_WOULD_REVERT` instead of a human-readable message.
 - **Project settings cache** — SDK caches settings for 5 minutes. After enabling new chains in the dashboard, hard refresh or clear site data.
 
 ## Related
